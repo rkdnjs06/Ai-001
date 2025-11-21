@@ -1,18 +1,17 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import pathlib # 파일 경로 확인을 위한 라이브러리
+import pathlib 
+import os # 파일 목록 확인을 위한 라이브러리 추가
 
-# 1. 데이터 로드 및 전처리 함수 (파일 존재 및 인코딩 문제 해결 강화)
+# 1. 데이터 로드 및 전처리 함수 (변화 없음)
 @st.cache_data
 def load_and_preprocess_data():
     file_path = pathlib.Path("aaasd.csv")
     
-    # 1. 파일 존재 여부 확인
     if not file_path.exists():
         return "FILE_NOT_FOUND" 
     
-    # 2. 인코딩 시도: 가장 흔한 인코딩들을 순차적으로 시도합니다.
     encodings = ['utf-8', 'euc-kr', 'cp949', 'latin1']
     df = None
     successful_encoding = None
@@ -30,33 +29,25 @@ def load_and_preprocess_data():
         
     # ------------------ 데이터 전처리 ------------------
 
-    # 1. 컬럼 이름 정리
     df['행정구역'] = df['행정구역'].astype(str).str.replace(r'\s+\(.*?\)', '', regex=True)
 
-    # '계' 데이터 컬럼만 선택
     base_cols = ['행정구역', '2025년10월_계_총인구수']
-    # '연령구간인구수' 컬럼을 제외하고 '~'가 포함된 연령대 컬럼만 선택
     age_cols = [col for col in df.columns if col.startswith('2025년10월_계_') and '~' in col and '연령구간인구수' not in col]
     
     df_filtered = df[base_cols + age_cols].copy()
     
-    # 2. 수치 데이터 타입 정리 (쉼표 제거 및 정수형 변환)
     numeric_cols = df_filtered.columns.drop('행정구역')
     for col in numeric_cols:
         if df_filtered[col].dtype == 'object':
-            # 쉼표, 따옴표, 공백 제거 후 숫자로 변환 (변환 불가 시 NaN 처리)
             df_filtered[col] = df_filtered[col].astype(str).str.replace(r'[," ]', '', regex=True)
             df_filtered[col] = pd.to_numeric(df_filtered[col], errors='coerce').astype('Int64')
         else:
             df_filtered[col] = df_filtered[col].astype('Int64')
             
-    # 데이터 변환 중 발생한 결측치(NaN)가 포함된 행 삭제
     df_filtered.dropna(inplace=True) 
 
-    # '전국' 데이터 제외
     df_filtered = df_filtered[df_filtered['행정구역'] != '전국']
     
-    # 3. Wide-to-Long 형식으로 데이터 변환
     df_long = pd.melt(
         df_filtered, 
         id_vars=['행정구역'],
@@ -65,12 +56,11 @@ def load_and_preprocess_data():
         value_name='인구수'
     )
     
-    # 4. 연령대 컬럼 정제
     df_long['연령대'] = df_long['연령대'].str.replace('2025년10월_계_', '')
     
     return (df_long, successful_encoding)
 
-# 2. Plotly 그래프 생성 함수
+# 2. Plotly 그래프 생성 함수 (변화 없음)
 def create_population_chart(df_data, selected_region):
     df_region = df_data[df_data['행정구역'] == selected_region]
     age_order = df_region['연령대'].unique().tolist()
@@ -108,17 +98,28 @@ def main():
     st.title("🗺️ 행정구역별 연령별 인구 분포 시각화")
     st.markdown("---")
     
+    # ------------------- ✨ 진단 코드: 파일 리스트 출력 ✨ -------------------
+    st.sidebar.subheader("📄 File Path 진단")
+    try:
+        # 서버가 현재 디렉토리에서 인식하는 파일 목록 출력
+        current_files = os.listdir(pathlib.Path.cwd())
+        st.sidebar.info(f"**현재 폴더 파일:** {', '.join(current_files)}")
+    except Exception as e:
+        st.sidebar.error(f"Failed to list files: {e}")
+    st.sidebar.markdown("---")
+    # -------------------------------------------------------------------------
+    
     # 데이터 로드 시도 및 오류 진단
     data_result = load_and_preprocess_data()
     
     if data_result == "FILE_NOT_FOUND":
         st.error("❌ 데이터 로드 실패: 'aaasd.csv' 파일을 찾을 수 없습니다.")
-        st.info("💡 **진단:** 파일명이 대소문자를 포함하여 정확히 `aaasd.csv` 인지, 그리고 `app.py`와 같은 폴더에 있는지 확인해 주세요.")
+        st.info("💡 **진단:** 사이드바에 출력된 **'현재 폴더 파일'** 목록을 확인해 주십시오. 목록에 `aaasd.csv`가 없다면 GitHub 커밋/푸시가 누락되었거나, 파일명이 틀린 것입니다.")
         return
         
     if data_result == "ENCODING_FAILURE":
         st.error("❌ 데이터 로드 실패: 지원되는 인코딩으로 파일을 읽을 수 없습니다.")
-        st.info("💡 **진단:** `utf-8`, `euc-kr`, `cp949`, `latin1` 인코딩으로도 파일을 열 수 없습니다. 파일이 깨지지 않았는지 확인해 주세요.")
+        st.info("💡 **진단:** 파일 인코딩 문제이거나, 데이터 자체가 손상되었을 수 있습니다.")
         return
     
     # 성공적으로 데이터를 로드한 경우
