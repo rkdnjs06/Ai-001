@@ -10,7 +10,6 @@ def load_and_preprocess_data():
     
     # 1. 파일 존재 여부 확인
     if not file_path.exists():
-        # 파일이 없으면 명확한 메시지를 리턴하여 main 함수에서 출력
         return "FILE_NOT_FOUND" 
     
     # 2. 인코딩 시도: 가장 흔한 인코딩들을 순차적으로 시도합니다.
@@ -20,16 +19,13 @@ def load_and_preprocess_data():
 
     for encoding in encodings:
         try:
-            # 파일을 해당 인코딩으로 읽어오기 시도
             df = pd.read_csv(file_path, encoding=encoding)
             successful_encoding = encoding
             break
         except Exception:
-            # 실패하면 다음 인코딩 시도
             continue 
 
     if df is None:
-        # 모든 인코딩 시도 실패 시
         return "ENCODING_FAILURE"
         
     # ------------------ 데이터 전처리 ------------------
@@ -39,7 +35,7 @@ def load_and_preprocess_data():
 
     # '계' 데이터 컬럼만 선택
     base_cols = ['행정구역', '2025년10월_계_총인구수']
-    # 연령구간인구수 컬럼을 제외하고 '~'가 포함된 연령대 컬럼만 선택
+    # '연령구간인구수' 컬럼을 제외하고 '~'가 포함된 연령대 컬럼만 선택
     age_cols = [col for col in df.columns if col.startswith('2025년10월_계_') and '~' in col and '연령구간인구수' not in col]
     
     df_filtered = df[base_cols + age_cols].copy()
@@ -72,7 +68,6 @@ def load_and_preprocess_data():
     # 4. 연령대 컬럼 정제
     df_long['연령대'] = df_long['연령대'].str.replace('2025년10월_계_', '')
     
-    # 성공적으로 로드된 DataFrame과 성공 인코딩 정보를 튜플로 반환
     return (df_long, successful_encoding)
 
 # 2. Plotly 그래프 생성 함수
@@ -118,18 +113,17 @@ def main():
     
     if data_result == "FILE_NOT_FOUND":
         st.error("❌ 데이터 로드 실패: 'aaasd.csv' 파일을 찾을 수 없습니다.")
-        st.info("💡 **진단:** Streamlit Cloud에서 파일 경로 인식이 실패했을 수 있습니다. 파일명이 **대소문자를 포함하여 정확히** `aaasd.csv` 인지, 그리고 `app.py`와 **같은 폴더**에 있는지 확인해 주세요.")
+        st.info("💡 **진단:** 파일명이 대소문자를 포함하여 정확히 `aaasd.csv` 인지, 그리고 `app.py`와 같은 폴더에 있는지 확인해 주세요.")
         return
         
     if data_result == "ENCODING_FAILURE":
         st.error("❌ 데이터 로드 실패: 지원되는 인코딩으로 파일을 읽을 수 없습니다.")
-        st.info("💡 **진단:** `utf-8`, `euc-kr`, `cp949`, `latin1` 인코딩으로도 파일을 열 수 없습니다. 파일이 깨지지 않았는지 또는 특이한 인코딩을 사용하고 있는지 확인해 주세요.")
+        st.info("💡 **진단:** `utf-8`, `euc-kr`, `cp949`, `latin1` 인코딩으로도 파일을 열 수 없습니다. 파일이 깨지지 않았는지 확인해 주세요.")
         return
     
     # 성공적으로 데이터를 로드한 경우
     df_long, successful_encoding = data_result
     
-    # 사이드바에 성공 메시지 출력
     st.sidebar.success(f"데이터 로드 성공 (인코딩: {successful_encoding})")
 
     # 사이드바에 지역 선택 위젯 생성
@@ -137,4 +131,22 @@ def main():
     selected_region = st.sidebar.selectbox(
         "🔎 **행정구역을 선택하세요**",
         region_list,
-        index=
+        index=region_list.index('서울특별시') if '서울특별시' in region_list else 0
+    )
+
+    # 메인 화면에 설명 출력
+    st.header(f"**선택 지역:** {selected_region}")
+    st.write("선택하신 지역의 연령대별 인구수(남녀 합산)를 보여주는 꺾은선 그래프입니다.")
+    
+    # 그래프 생성 및 표시
+    fig = create_population_chart(df_long, selected_region)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    st.subheader("📊 데이터 정보")
+    st.dataframe(df_long[df_long['행정구역'] == selected_region].rename(columns={'인구수': '인구수 (명)'}), use_container_width=True)
+    st.caption("데이터 출처: 2025년 10월 기준 인구 통계 (가정)")
+
+
+if __name__ == "__main__":
+    main()
