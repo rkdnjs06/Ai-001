@@ -2,33 +2,53 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import pathlib 
-import os # 파일 목록 확인을 위한 라이브러리 추가
 
-# 1. 데이터 로드 및 전처리 함수 (변화 없음)
+# 1. 데이터 로드 및 전처리 함수 (모든 파일명/인코딩 조합 시도)
 @st.cache_data
 def load_and_preprocess_data():
-    file_path = pathlib.Path("aaasd.csv")
     
-    if not file_path.exists():
-        return "FILE_NOT_FOUND" 
-    
+    # 1. 파일 이름 및 인코딩 조합 정의
+    file_names_to_try = ["aaasd.csv", "AAASD.csv", "aaasd.CSV", "AAASD.CSV"]
     encodings = ['utf-8', 'euc-kr', 'cp949', 'latin1']
+    
     df = None
     successful_encoding = None
-
-    for encoding in encodings:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            successful_encoding = encoding
-            break
-        except Exception:
-            continue 
-
-    if df is None:
-        return "ENCODING_FAILURE"
+    
+    # 모든 가능한 파일 이름과 인코딩 조합을 시도합니다.
+    for file_name in file_names_to_try:
+        file_path = pathlib.Path(file_name)
         
+        # 파일이 존재하는지 확인
+        if not file_path.exists():
+            continue # 다음 파일 이름 시도
+
+        # 존재하는 파일에 대해 모든 인코딩 시도
+        for encoding in encodings:
+            try:
+                df = pd.read_csv(file_path, encoding=encoding)
+                successful_encoding = encoding
+                
+                # 성공 시, 즉시 중단
+                break
+            except Exception:
+                continue # 다음 인코딩 시도
+        
+        # 인코딩 성공 시, 바깥 루프도 중단
+        if df is not None:
+            break
+
+    # 파일 또는 인코딩 로드 실패 최종 판단
+    if df is None:
+        # 파일은 존재했으나 모든 인코딩 실패
+        if pathlib.Path("aaasd.csv").exists() or pathlib.Path("AAASD.csv").exists():
+             return "ENCODING_FAILURE"
+        # 파일 자체가 존재하지 않음
+        else:
+             return "FILE_NOT_FOUND" 
+
     # ------------------ 데이터 전처리 ------------------
 
+    # 1. 컬럼 이름 정리
     df['행정구역'] = df['행정구역'].astype(str).str.replace(r'\s+\(.*?\)', '', regex=True)
 
     base_cols = ['행정구역', '2025년10월_계_총인구수']
@@ -36,6 +56,7 @@ def load_and_preprocess_data():
     
     df_filtered = df[base_cols + age_cols].copy()
     
+    # 2. 수치 데이터 타입 정리 (쉼표 제거 및 정수형 변환)
     numeric_cols = df_filtered.columns.drop('행정구역')
     for col in numeric_cols:
         if df_filtered[col].dtype == 'object':
@@ -48,6 +69,7 @@ def load_and_preprocess_data():
 
     df_filtered = df_filtered[df_filtered['행정구역'] != '전국']
     
+    # 3. Wide-to-Long 형식으로 데이터 변환
     df_long = pd.melt(
         df_filtered, 
         id_vars=['행정구역'],
@@ -56,6 +78,7 @@ def load_and_preprocess_data():
         value_name='인구수'
     )
     
+    # 4. 연령대 컬럼 정제
     df_long['연령대'] = df_long['연령대'].str.replace('2025년10월_계_', '')
     
     return (df_long, successful_encoding)
@@ -98,28 +121,16 @@ def main():
     st.title("🗺️ 행정구역별 연령별 인구 분포 시각화")
     st.markdown("---")
     
-    # ------------------- ✨ 진단 코드: 파일 리스트 출력 ✨ -------------------
-    st.sidebar.subheader("📄 File Path 진단")
-    try:
-        # 서버가 현재 디렉토리에서 인식하는 파일 목록 출력
-        current_files = os.listdir(pathlib.Path.cwd())
-        st.sidebar.info(f"**현재 폴더 파일:** {', '.join(current_files)}")
-    except Exception as e:
-        st.sidebar.error(f"Failed to list files: {e}")
-    st.sidebar.markdown("---")
-    # -------------------------------------------------------------------------
-    
-    # 데이터 로드 시도 및 오류 진단
     data_result = load_and_preprocess_data()
     
     if data_result == "FILE_NOT_FOUND":
-        st.error("❌ 데이터 로드 실패: 'aaasd.csv' 파일을 찾을 수 없습니다.")
-        st.info("💡 **진단:** 사이드바에 출력된 **'현재 폴더 파일'** 목록을 확인해 주십시오. 목록에 `aaasd.csv`가 없다면 GitHub 커밋/푸시가 누락되었거나, 파일명이 틀린 것입니다.")
+        st.error("❌ 최종 데이터 로드 실패: 'aaasd.csv' 파일을 찾을 수 없습니다.")
+        st.info("💡 **최종 진단:** `app.py`, `requirements.txt`, **그리고 `aaasd.csv`** 이 세 파일이 GitHub 저장소의 **같은 루트 폴더**에 있는지 **반드시** 확인하시고, **커밋 및 푸시**가 모두 완료되었는지 확인해 주십시오.")
         return
         
     if data_result == "ENCODING_FAILURE":
-        st.error("❌ 데이터 로드 실패: 지원되는 인코딩으로 파일을 읽을 수 없습니다.")
-        st.info("💡 **진단:** 파일 인코딩 문제이거나, 데이터 자체가 손상되었을 수 있습니다.")
+        st.error("❌ 최종 데이터 로드 실패: 지원되는 인코딩으로 파일을 읽을 수 없습니다.")
+        st.info("💡 **최종 진단:** 파일명/경로는 찾았으나, 파일 자체의 데이터가 손상되었거나 파이썬/판다스에서 지원하지 않는 특수한 인코딩일 가능성이 높습니다.")
         return
     
     # 성공적으로 데이터를 로드한 경우
