@@ -1,72 +1,81 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import pathlib # 파일 경로 확인을 위한 라이브러리
 
-# 1. 데이터 로드 및 전처리 함수 (인코딩 문제 해결)
+# 1. 데이터 로드 및 전처리 함수 (파일 존재 및 인코딩 문제 해결 강화)
 @st.cache_data
 def load_and_preprocess_data():
-    file_path = "aaasd.csv"
+    file_path = pathlib.Path("aaasd.csv")
     
-    # **인코딩 문제 해결을 위해 여러 인코딩을 순차적으로 시도합니다.**
-    encodings = ['utf-8', 'euc-kr', 'cp949']
+    # 1. 파일 존재 여부 확인
+    if not file_path.exists():
+        # 파일이 없으면 명확한 메시지를 리턴하여 main 함수에서 출력
+        return "FILE_NOT_FOUND" 
+    
+    # 2. 인코딩 시도: 가장 흔한 인코딩들을 순차적으로 시도합니다.
+    encodings = ['utf-8', 'euc-kr', 'cp949', 'latin1']
     df = None
-    
+    successful_encoding = None
+
     for encoding in encodings:
         try:
+            # 파일을 해당 인코딩으로 읽어오기 시도
             df = pd.read_csv(file_path, encoding=encoding)
-            # st.success(f"✅ 파일을 '{encoding}' 인코딩으로 성공적으로 로드했습니다.")
+            successful_encoding = encoding
             break
-        except FileNotFoundError:
-            st.error(f"⚠️ '{file_path}' 파일을 찾을 수 없습니다. 파일을 'app.py'와 같은 폴더에 넣어주세요.")
-            return None
         except Exception:
-            # 다음 인코딩 시도를 위해 오류를 무시하고 진행
+            # 실패하면 다음 인코딩 시도
             continue 
 
     if df is None:
-        st.error("❌ 파일 로드에 실패했습니다. 'utf-8', 'euc-kr', 'cp949' 중 맞는 인코딩이 없거나 데이터에 문제가 있습니다.")
-        return None
+        # 모든 인코딩 시도 실패 시
+        return "ENCODING_FAILURE"
         
     # ------------------ 데이터 전처리 ------------------
 
-    # 1. 컬럼 이름 정리 (지역 코드 제거 및 '계' 인구만 필터링)
+    # 1. 컬럼 이름 정리
     df['행정구역'] = df['행정구역'].astype(str).str.replace(r'\s+\(.*?\)', '', regex=True)
 
-    # 계(총 인구) 데이터 컬럼만 선택 ('연령구간인구수'는 제외)
+    # '계' 데이터 컬럼만 선택
     base_cols = ['행정구역', '2025년10월_계_총인구수']
-    age_cols_raw = [col for col in df.columns if col.startswith('2025년10월_계_') and '~' in col]
+    # 연령구간인구수 컬럼을 제외하고 '~'가 포함된 연령대 컬럼만 선택
+    age_cols = [col for col in df.columns if col.startswith('2025년10월_계_') and '~' in col and '연령구간인구수' not in col]
     
-    df_filtered = df[base_cols + age_cols_raw].copy()
+    df_filtered = df[base_cols + age_cols].copy()
     
     # 2. 수치 데이터 타입 정리 (쉼표 제거 및 정수형 변환)
     numeric_cols = df_filtered.columns.drop('행정구역')
     for col in numeric_cols:
-        # 데이터에 쉼표가 포함되어 object 타입일 경우 처리
         if df_filtered[col].dtype == 'object':
-            # 쉼표와 따옴표 제거 후 숫자로 변환
+            # 쉼표, 따옴표, 공백 제거 후 숫자로 변환 (변환 불가 시 NaN 처리)
             df_filtered[col] = df_filtered[col].astype(str).str.replace(r'[," ]', '', regex=True)
             df_filtered[col] = pd.to_numeric(df_filtered[col], errors='coerce').astype('Int64')
         else:
             df_filtered[col] = df_filtered[col].astype('Int64')
             
-    # '전국' 데이터는 선택지에서 제외 (분석의 편의를 위해)
+    # 데이터 변환 중 발생한 결측치(NaN)가 포함된 행 삭제
+    df_filtered.dropna(inplace=True) 
+
+    # '전국' 데이터 제외
     df_filtered = df_filtered[df_filtered['행정구역'] != '전국']
     
-    # 3. Wide-to-Long 형식으로 데이터 변환 (Plotly 시각화를 위해)
+    # 3. Wide-to-Long 형식으로 데이터 변환
     df_long = pd.melt(
         df_filtered, 
         id_vars=['행정구역'],
-        value_vars=age_cols_raw,
+        value_vars=age_cols, 
         var_name='연령대',
         value_name='인구수'
     )
     
-    # 4. 연령대 컬럼 정제 (예: '2025년10월_계_0~9세' -> '0~9세')
+    # 4. 연령대 컬럼 정제
     df_long['연령대'] = df_long['연령대'].str.replace('2025년10월_계_', '')
+    
+    # 성공적으로 로드된 DataFrame과 성공 인코딩 정보를 튜플로 반환
+    return (df_long, successful_encoding)
 
-    return df_long
-
-# 2. Plotly 그래프 생성 함수 (변화 없음)
+# 2. Plotly 그래프 생성 함수
 def create_population_chart(df_data, selected_region):
     df_region = df_data[df_data['행정구역'] == selected_region]
     age_order = df_region['연령대'].unique().tolist()
@@ -94,7 +103,7 @@ def create_population_chart(df_data, selected_region):
     
     return fig
 
-# 3. Streamlit 메인 함수 (변화 없음)
+# 3. Streamlit 메인 함수
 def main():
     st.set_page_config(
         page_title="행정구역별 인구 분포 분석",
@@ -104,33 +113,28 @@ def main():
     st.title("🗺️ 행정구역별 연령별 인구 분포 시각화")
     st.markdown("---")
     
-    # 데이터 로드 시도
-    df_long = load_and_preprocess_data()
+    # 데이터 로드 시도 및 오류 진단
+    data_result = load_and_preprocess_data()
     
-    if df_long is None:
+    if data_result == "FILE_NOT_FOUND":
+        st.error("❌ 데이터 로드 실패: 'aaasd.csv' 파일을 찾을 수 없습니다.")
+        st.info("💡 **진단:** Streamlit Cloud에서 파일 경로 인식이 실패했을 수 있습니다. 파일명이 **대소문자를 포함하여 정확히** `aaasd.csv` 인지, 그리고 `app.py`와 **같은 폴더**에 있는지 확인해 주세요.")
         return
+        
+    if data_result == "ENCODING_FAILURE":
+        st.error("❌ 데이터 로드 실패: 지원되는 인코딩으로 파일을 읽을 수 없습니다.")
+        st.info("💡 **진단:** `utf-8`, `euc-kr`, `cp949`, `latin1` 인코딩으로도 파일을 열 수 없습니다. 파일이 깨지지 않았는지 또는 특이한 인코딩을 사용하고 있는지 확인해 주세요.")
+        return
+    
+    # 성공적으로 데이터를 로드한 경우
+    df_long, successful_encoding = data_result
+    
+    # 사이드바에 성공 메시지 출력
+    st.sidebar.success(f"데이터 로드 성공 (인코딩: {successful_encoding})")
 
     # 사이드바에 지역 선택 위젯 생성
     region_list = sorted(df_long['행정구역'].unique().tolist())
     selected_region = st.sidebar.selectbox(
         "🔎 **행정구역을 선택하세요**",
         region_list,
-        index=region_list.index('서울특별시') if '서울특별시' in region_list else 0
-    )
-
-    # 메인 화면에 설명 출력
-    st.header(f"**선택 지역:** {selected_region}")
-    st.write("선택하신 지역의 연령대별 인구수(남녀 합산)를 보여주는 꺾은선 그래프입니다.")
-    
-    # 그래프 생성 및 표시
-    fig = create_population_chart(df_long, selected_region)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("📊 데이터 정보")
-    st.dataframe(df_long[df_long['행정구역'] == selected_region].rename(columns={'인구수': '인구수 (명)'}), use_container_width=True)
-    st.caption("데이터 출처: 2025년 10월 기준 인구 통계 (가정)")
-
-
-if __name__ == "__main__":
-    main()
+        index=
