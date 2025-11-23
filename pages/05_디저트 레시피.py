@@ -69,11 +69,13 @@ recipes = {
     "호쿠토모치 (Hokuto Mochi)": "재료: 모치 100g, 단팥앙금 50g\n\n1. 모치 전자레인지 1분.\n2. 앙금 감싸기.",
     "카스텔라 롤 (Castella Roll)": "재료: 계란 3개, 설탕 70g, 밀가루 80g, 꿀 1큰술\n\n1. 계란+설탕 휘핑.\n2. 밀가루 체쳐 섞기.\n3. 180도 오븐 15분, 말아 완성.",
     "사쿠라 젤리 (Sakura Jelly)": "재료: 벚꽃잎 5장, 한천 2g, 물 50ml, 설탕 20g\n\n1. 한천+물+설탕 끓이기.\n2. 컵에 벚꽃잎 넣고 붓기.\n3. 굳히기.",
-    "모치 아이스크림 (Mochi Ice Cream)": "재료: 모치 100g, 아이스크림 50g\n\n1. 모치
+    "모치 아이스크림 (Mochi Ice Cream)": "재료: 모치 100g, 아이스크림 50g\n\n1. 모치 전자레인지 1분.\n2. 아이스크림 감싸 냉동 30분.",
+    "아즈키 아이스크림 (Azuki Ice Cream)": "재료: 아이스크림 100g, 팥앙금 50g\n\n1. 아이스크림에 팥앙금 섞기.\n2. 얼린 후 완성."
+}
 
 # 디저트 선택
-selected_dessert = st.selectbox("🍪 디저트를 선택하세요", desserts)
+dessert_choice = st.selectbox("🍮 디저트를 선택하세요", desserts)
 
-# 선택한 디저트 레시피 표시
-st.subheader(f"🍰 {selected_dessert} 레시피")
-st.text(recipes[selected_dessert])
+# 선택한 디저트 레시피 보여주기
+st.subheader(f"🍴 {dessert_choice} 레시피")
+st.code(recipes[dessert_choice])
