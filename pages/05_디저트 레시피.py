@@ -1,10 +1,11 @@
 import streamlit as st
 
-st.set_page_config(page_title="🍡 일본 전통 디저트 레시피", page_icon="🍵", layout="centered")
+st.set_page_config(page_title="🍡 일본 전통 디저트", page_icon="🍵", layout="centered")
 
-st.title("🍡 일본 전통 디저트 레시피 & 설명")
-st.write("일본의 전통 디저트를 선택하면 간단한 설명과 레시피를 보여드려요. 🥢")
-
+# 세션 상태 초기화
+if "show_welcome" not in st.session_state:
+    st.session_state.show_welcome = True
+    
 # 디저트 리스트
 desserts = [
     "모치 (Mochi)", "다이후쿠 (Daifuku)", "만주 (Manju)", "양갱 (Yokan)", "센베이 (Senbei)",
@@ -73,14 +74,27 @@ dessert_info = {
     "아즈키 아이스크림 (Azuki Ice Cream)": {"description": "팥앙금을 넣은 아이스크림 모치.", "recipe": "모치 50g, 아이스크림 50g, 팥앙금 20g\n1. 모치 준비\n2. 아이스크림+팥앙금 넣기"}
 }
 
-# 디저트 선택
-dessert_choice = st.selectbox("🍮 디저트를 선택하세요", desserts)
+# 환영 페이지
+if st.session_state.show_welcome:
+    st.title("🍡 일본 전통 디저트 레시피에 오신 것을 환영합니다!")
+    st.write("""
+    안녕하세요! 🥰  
+    일본의 다양한 전통 디저트를 탐험하며 레시피와 설명을 확인할 수 있어요.  
+    아래 버튼을 눌러 시작해볼까요?
+    """)
+    if st.button("🎉 디저트 탐험 시작"):
+        st.session_state.show_welcome = False
 
-# 선택한 디저트 설명과 레시피 출력
-info = dessert_info.get(dessert_choice, {"description": "설명 없음", "recipe": "레시피 없음"})
+# 디저트 선택 페이지
+else:
+    st.title("🍮 디저트 선택")
+    st.write("원하는 일본 전통 디저트를 선택하면 상세 설명과 레시피를 보여드립니다. 🥢")
 
-st.subheader(f"🍴 {dessert_choice} 설명")
-st.write(info["description"])
+    dessert_choice = st.selectbox("🍮 디저트를 선택하세요", desserts)
+    info = dessert_info.get(dessert_choice, {"description": "설명 없음", "recipe": "레시피 없음"})
 
-st.subheader(f"🍴 {dessert_choice} 레시피")
-st.code(info["recipe"])
+    st.subheader(f"🍴 {dessert_choice} 설명")
+    st.write(info["description"])
+
+    st.subheader(f"🍴 {dessert_choice} 레시피")
+    st.code(info["recipe"])
