@@ -70,3 +70,10 @@ recipes = {
     "카스텔라 롤 (Castella Roll)": "재료: 계란 3개, 설탕 70g, 밀가루 80g, 꿀 1큰술\n\n1. 계란+설탕 휘핑.\n2. 밀가루 체쳐 섞기.\n3. 180도 오븐 15분, 말아 완성.",
     "사쿠라 젤리 (Sakura Jelly)": "재료: 벚꽃잎 5장, 한천 2g, 물 50ml, 설탕 20g\n\n1. 한천+물+설탕 끓이기.\n2. 컵에 벚꽃잎 넣고 붓기.\n3. 굳히기.",
     "모치 아이스크림 (Mochi Ice Cream)": "재료: 모치 100g, 아이스크림 50g\n\n1. 모치
+
+# 디저트 선택
+selected_dessert = st.selectbox("🍪 디저트를 선택하세요", desserts)
+
+# 선택한 디저트 레시피 표시
+st.subheader(f"🍰 {selected_dessert} 레시피")
+st.text(recipes[selected_dessert])
